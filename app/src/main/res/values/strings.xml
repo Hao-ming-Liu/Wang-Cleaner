@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">王清理</string>
+    <string name="accessibility_description">仅在你启用的应用中读取界面节点，自动点击广告跳过、取消打开提示，或按你设置的规则执行返回。不会保存屏幕正文、密码或上传数据。返回发生于跳转之后，无法阻止其他应用读取传感器。可随时在王清理首页暂停或在系统设置关闭服务。</string>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#176B52</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F5F6F0</item>
+        <item name="android:navigationBarColor">#F5F6F0</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

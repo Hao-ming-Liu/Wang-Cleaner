@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="screen_title" type="id" />
+    <item name="screen_message" type="id" />
+    <item name="splash_skip" type="id" />
+    <item name="prompt_cancel" type="id" />
+    <item name="negative_skip" type="id" />
+    <item name="negative_cancel" type="id" />
+</resources>
