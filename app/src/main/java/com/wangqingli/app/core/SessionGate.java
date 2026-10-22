@@ -57,6 +57,13 @@ public final class SessionGate {
         return true;
     }
 
+    /** Remaining delay for an already received event; never creates a new scan slot. */
+    public long remainingScanDelay(long now) {
+        if (!scanned) return 0;
+        if (now < lastScan) return SCAN_INTERVAL_MS;
+        return Math.max(0, SCAN_INTERVAL_MS - (now - lastScan));
+    }
+
     /** Only evidence observed in the current app's splash window is accepted. */
     public void markAd(String packageName, long now) {
         if (!inSplashWindow(packageName, now)) return;

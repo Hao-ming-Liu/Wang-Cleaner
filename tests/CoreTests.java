@@ -128,6 +128,20 @@ public final class CoreTests {
             yes(g.scan(500));
             no(g.scan(499));
         });
+        test("final event inside scan cooldown can run once at its original due time", () -> {
+            Gate g = new Gate();
+            equal(0L, g.scanDelay(180));
+            yes(g.scan(180));
+            no(g.scan(380));
+            equal(50L, g.scanDelay(380));
+            equal(30L, g.scanDelay(400));
+            equal(0L, g.scanDelay(430));
+            yes(g.scan(430));
+            equal(250L, g.scanDelay(430));
+            equal(0L, g.scanDelay(1000));
+            g.reset();
+            equal(0L, g.scanDelay(431));
+        });
         test("fresh source evidence survives target enter and allows one return", () -> {
             Gate g = new Gate();
             g.enter("source", 100);
@@ -253,6 +267,9 @@ public final class CoreTests {
     private static void equal(String expected, String actual) {
         if (!Objects.equals(expected, actual)) throw new AssertionError("expected " + expected + ", got " + actual);
     }
+    private static void equal(long expected, long actual) {
+        if (expected != actual) throw new AssertionError("expected " + expected + ", got " + actual);
+    }
 
     // Reflection lets the initial test run report missing production APIs as
     // assertion failures, with no Android SDK or test library dependency.
@@ -295,6 +312,7 @@ public final class CoreTests {
         void enter(String p, long now) { c("enter", new Class<?>[] {String.class, long.class}, p, now); }
         boolean splash(String p, long now) { return (Boolean) c("inSplashWindow", new Class<?>[] {String.class, long.class}, p, now); }
         boolean scan(long now) { return (Boolean) c("canScan", new Class<?>[] {long.class}, now); }
+        long scanDelay(long now) { return (Long) c("remainingScanDelay", new Class<?>[] {long.class}, now); }
         void ad(String p, long now) { c("markAd", new Class<?>[] {String.class, long.class}, p, now); }
         boolean canReturn(String from, String to, long now) { return (Boolean) c("canReturn", new Class<?>[] {String.class, String.class, long.class}, from, to, now); }
         boolean canAct(String key, long now) { return (Boolean) c("canAct", new Class<?>[] {String.class, long.class}, key, now); }

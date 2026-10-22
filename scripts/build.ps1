@@ -66,10 +66,13 @@ Write-Host "Gradle cache: $env:GRADLE_USER_HOME"
 Push-Location -LiteralPath $projectRoot
 try {
     if ($Test) {
-        & (Join-Path $PSScriptRoot 'test-core.ps1')
+        & (Join-Path $PSScriptRoot 'test-core.ps1') -JavaHome $env:JAVA_HOME
     }
     $gradleTasks = @(':app:assembleDebug', ':fixture:assembleDebug')
-    & (Join-Path $projectRoot 'gradlew.bat') --offline --no-daemon --console=plain @gradleTasks
+    if ($Test) { $gradleTasks += @(':app:assembleDebugAndroidTest', ':fixture:assembleLanding') }
+    # Use the installed SDK resource compiler so offline builds need no Maven aapt2 artifact.
+    $resourceCompiler = Join-Path $buildTools 'aapt2.exe'
+    & (Join-Path $projectRoot 'gradlew.bat') --offline --no-daemon --console=plain "-Pandroid.aapt2FromMavenOverride=$resourceCompiler" @gradleTasks
     if ($LASTEXITCODE -ne 0) {
         throw "Gradle failed with exit code $LASTEXITCODE."
     }

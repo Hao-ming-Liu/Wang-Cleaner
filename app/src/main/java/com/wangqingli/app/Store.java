@@ -73,22 +73,34 @@ public final class Store extends SQLiteOpenHelper {
         JSONArray a=ruleDocument().optJSONArray("returns");
         if(a!=null)for(int i=0;i<a.length();i++){JSONObject r=a.optJSONObject(i);if(r!=null&&r.optBoolean("enabled",false)&&source.equals(r.optString("source"))&&target.equals(r.optString("target")))return true;}return false;
     }
-    public void importRules(String json) throws JSONException {
+    public synchronized void importRules(String json) throws JSONException {
         if(json.length()>131072)throw new JSONException("文件超过 128 KB");
-        JSONObject doc=new JSONObject(json);if(doc.optInt("version",0)!=1)throw new JSONException("仅支持 version: 1 的王清理规则");
+        JSONObject doc=new JSONObject(json);if(!(doc.opt("version") instanceof Integer)||doc.getInt("version")!=1)throw new JSONException("仅支持整数 version: 1 的王清理规则");
         JSONArray rules=doc.optJSONArray("rules"),returns=doc.optJSONArray("returns");
         if(rules==null||returns==null||rules.length()>100||returns.length()>100)throw new JSONException("需要 rules 和 returns 数组，每类最多 100 条");
         Set<String> ids=new HashSet<>();
         for(int i=0;i<rules.length();i++) {
-            JSONObject r=rules.getJSONObject(i);String id=r.getString("id"),pkg=r.getString("package"),kind=r.getString("kind");
+            JSONObject r=rules.getJSONObject(i);
+            validateTypes(r,new String[]{"id","package","kind","text","viewId","activity","context"});
+            String id=r.getString("id"),pkg=r.getString("package"),kind=r.getString("kind");
             if(id.isEmpty()||id.length()>80||!ids.add(id)||!validPackage(pkg)||!(kind.equals("splash")||kind.equals("prompt")))throw new JSONException("规则编号、包名或类型无效");
             if(r.optString("text").isEmpty()&&r.optString("viewId").isEmpty())throw new JSONException("必须指定 text 或 viewId");
             for(String k:new String[]{"text","viewId","activity","context"})if(r.optString(k).length()>200)throw new JSONException("规则字段过长");
             if(kind.equals("prompt")&&r.optString("context").isEmpty())throw new JSONException("提示规则必须指定 context");
             if(!r.optString("viewId").isEmpty()&&!r.optString("viewId").startsWith(pkg+":id/"))throw new JSONException("viewId 必须属于指定应用");
         }
-        for(int i=0;i<returns.length();i++){JSONObject r=returns.getJSONObject(i);String s=r.getString("source"),t=r.getString("target");if(!validPackage(s)||!validPackage(t)||s.equals(t)||s.equals("com.wangqingli.app")||t.equals("com.wangqingli.app"))throw new JSONException("返回规则需要两个不同的外部应用包名");}
-        if(!prefs.edit().putString("rules",doc.toString()).commit())throw new JSONException("保存失败，原规则未确认更新");
+        for(int i=0;i<returns.length();i++){JSONObject r=returns.getJSONObject(i);validateTypes(r,new String[]{"source","target"});String s=r.getString("source"),t=r.getString("target");if(!validPackage(s)||!validPackage(t)||s.equals(t)||s.equals("com.wangqingli.app")||t.equals("com.wangqingli.app"))throw new JSONException("返回规则需要两个不同的外部应用包名");}
+        String old=prefs.getString("rules",null);
+        if(!prefs.edit().putString("rules",doc.toString()).commit()){
+            android.content.SharedPreferences.Editor rollback=prefs.edit();
+            if(old==null)rollback.remove("rules");else rollback.putString("rules",old);
+            boolean restored=rollback.commit();
+            throw new JSONException(restored?"保存失败，已恢复原规则":"保存失败，内存已恢复原规则；请检查磁盘空间");
+        }
+    }
+    private static void validateTypes(JSONObject r,String[] strings) throws JSONException {
+        for(String key:strings)if(r.has(key)&&!(r.get(key) instanceof String))throw new JSONException(key+" 必须是字符串");
+        if(r.has("enabled")&&!(r.get("enabled") instanceof Boolean))throw new JSONException("enabled 必须是 true 或 false");
     }
     public void addReturn(String source,String target) throws JSONException {
         JSONObject d=ruleDocument();JSONArray a=d.getJSONArray("returns");JSONObject r=new JSONObject();r.put("source",source);r.put("target",target);r.put("enabled",true);a.put(r);importRules(d.toString());

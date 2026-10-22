@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "fixture-explicit-skip",
+      "package": "com.wangqingli.fixture",
+      "kind": "splash",
+      "text": "跳过 5s",
+      "context": "广告",
+      "enabled": true
+    }
+  ],
+  "returns": [
+    {
+      "source": "tv.danmaku.bili",
+      "target": "com.taobao.taobao",
+      "enabled": false
+    }
+  ]
+}

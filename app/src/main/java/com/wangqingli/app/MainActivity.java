@@ -100,7 +100,8 @@ public final class MainActivity extends Activity {
         status.addView(button("刷新状态",this::render));status.addView(button("无障碍设置",this::accessibilityConsent));status.addView(button("电池优化设置",()->open(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))));status.addView(button("应用详情 / 后台与自启动",()->open(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))));
         toggle(status,"开机后提醒检查","需要通知权限；提醒不代表服务已恢复。",store.prefs.getBoolean("bootReminder",false),b->{store.prefs.edit().putBoolean("bootReminder",b).apply();if(b&&Build.VERSION.SDK_INT>=33)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);});
         LinearLayout xiaomi=card();label(xiaomi,"小米 / HyperOS 运行建议",17,INK,true);label(xiaomi,"1. 在系统设置中允许王清理自启动和后台运行。\n2. 将王清理的电池策略设为无限制（实际菜单名称随系统变化）。\n3. 在最近任务中锁定王清理。\n4. 重启后打开本页确认“服务已连接”。\n\n清理最近任务与“强行停止”不同。厂商仍可终止服务，强行停止后请手动打开并检查无障碍。",13,MUTED,false);
-        LinearLayout rules=card();label(rules,"本地规则",18,INK,true);label(rules,"借鉴 GKD 的按应用匹配思路。使用王清理 JSON v1 格式，不直接兼容 GKD 订阅；导入会替换现有本地规则和返回组合。内置文字匹配始终保留。",13,MUTED,false);
+        LinearLayout rules=card();label(rules,"本地规则",18,INK,true);label(rules,"借鉴 GKD 的按应用匹配思路。使用王清理 JSON v1 格式，不直接兼容 GKD 订阅；导入会替换现有本地规则和返回组合。",13,MUTED,false);
+        label(rules,"同一应用和类型存在本地规则时，只执行已开启且匹配的本地规则；即使全部停用，也不会回退内置规则。",12,MUTED,false);
         label(rules,"当前自定义规则："+store.rules().size()+" 条\n返回组合："+store.ruleDocument().optJSONArray("returns").length()+" 条",13,INK,false);
         rules.addView(button("导入 JSON 规则",()->new AlertDialog.Builder(this).setTitle("导入将替换现有规则").setMessage("请选择可信规则。验证失败会保留当前规则；应用保护开关不会自动打开。").setNegativeButton("取消",null).setPositiveButton("选择文件",(d,w)->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,101);}).show()));
         rules.addView(button("导出当前规则",()->createDocument(104,"application/json","王清理-规则.json")));
