@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
@@ -17,6 +19,9 @@ public final class MainActivity extends Activity {
     private static final int INK = Color.rgb(31, 41, 55);
     private static final int MUTED = Color.rgb(90, 103, 120);
     private String screen = "home";
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private int generation;
+    private int clicks;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,16 +46,27 @@ public final class MainActivity extends Activity {
         super.onSaveInstanceState(outState);
     }
 
+    @Override protected void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
     private String scenarioFrom(Intent intent) {
+        if (getPackageName().endsWith(".target")) return "landing";
         String scenario = intent == null ? null : intent.getStringExtra("scenario");
         if ("splash".equals(scenario) || "prompt".equals(scenario)
-                || "negative".equals(scenario)) {
+                || "negative".equals(scenario) || "delayed_splash".equals(scenario)
+                || "splash_sticky".equals(scenario) || "ad_link".equals(scenario)
+                || "no_ad_link".equals(scenario)) {
+            clicks = 0;
             return scenario;
         }
         return "home";
     }
 
     private void show(String requestedScreen) {
+        handler.removeCallbacksAndMessages(null);
+        final int pageGeneration = ++generation;
         screen = requestedScreen == null ? "home" : requestedScreen;
         LinearLayout root = column();
         root.setPadding(dp(20), dp(20), dp(20), dp(20));
@@ -64,7 +80,22 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(Color.rgb(247, 249, 252));
         switch (screen) {
             case "splash":
+            case "splash_sticky":
                 splash(root);
+                break;
+            case "delayed_splash":
+                result(root, "正在准备测试页面", "测试按钮将在一次内容更新后出现。");
+                handler.postDelayed(() -> { if (generation == pageGeneration) show("splash"); }, 320);
+                break;
+            case "ad_link":
+            case "no_ad_link":
+                root.addView(title("ad_link".equals(screen) ? "广告" : "广告设置"));
+                root.addView(message("本页无跳过按钮。下方按钮仅打开已安装的本地测试落地页。"));
+                root.addView(button("访问测试落地页", 0, () -> startActivity(new Intent().setClassName(
+                        "com.wangqingli.fixture.target", "com.wangqingli.fixture.MainActivity"))), wideButton());
+                break;
+            case "landing":
+                result(root, "测试落地页", "此页面没有广告或自动导航。系统返回会回到来源测试页面。");
                 break;
             case "prompt":
                 prompt(root);
@@ -93,6 +124,16 @@ public final class MainActivity extends Activity {
         // setContentView replaces the UI without starting another Activity. Signal the
         // page transition so the same window-event path is exercised by every scenario.
         root.post(() -> root.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED));
+        if ("splash_sticky".equals(screen)) {
+            // Real repeated content events exercise both cooldown and session deduplication.
+            handler.postDelayed(new Runnable() {
+                @Override public void run() {
+                    if (generation != pageGeneration) return;
+                    root.sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
+                    handler.postDelayed(this, 300);
+                }
+            }, 300);
+        }
     }
 
     private void home(LinearLayout root) {
@@ -112,11 +153,16 @@ public final class MainActivity extends Activity {
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(title("广告"), new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        top.addView(button("跳过 5s", R.id.splash_skip, () -> show("skipped")),
+        boolean sticky = "splash_sticky".equals(screen);
+        top.addView(button("跳过 5s", R.id.splash_skip, () -> {
+            if (sticky) { clicks++; show("splash_sticky"); }
+            else show("skipped");
+        }),
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)));
         root.addView(top);
         LinearLayout content = centeredContent(root);
         content.addView(message("开屏广告测试\n\n右上方为明确跳过按钮。\n“5s”为固定测试文案，不会自动结束。"));
+        if (sticky) content.addView(message("点击次数：" + clicks));
     }
 
     private void prompt(LinearLayout root) {

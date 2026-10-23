@@ -64,7 +64,9 @@ final class StoreTests {
             rejectRules(r, new JSONArray().put(rule("", "splash")));
             rejectRules(r, new JSONArray().put(rule("invalid", "splash").put("package", "bad package")));
             rejectRules(r, new JSONArray().put(rule("invalid", "back")));
-            rejectRules(r, new JSONArray().put(rule("invalid", "splash").remove("text")));
+            JSONObject noSelector = rule("invalid", "splash");
+            noSelector.remove("text");
+            rejectRules(r, new JSONArray().put(noSelector));
             rejectRules(r, new JSONArray().put(rule("invalid", "prompt")));
             rejectRules(r, new JSONArray().put(rule("invalid", "splash").put("viewId", OTHER + ":id/skip")));
             reject(r, document().put("returns", new JSONArray().put(returnRule(true).put("target", SOURCE))).toString());

@@ -110,7 +110,11 @@ public final class DeviceTestRunner extends Instrumentation {
                 : "settings put secure " + name + " " + quote(value));
     }
 
-    static String quote(String text) { return "'" + text.replace("'", "'\"'\"'") + "'"; }
+    // executeShellCommand tokenizes arguments directly; it does not interpret shell quotes.
+    static String quote(String text) {
+        if (!text.matches("[A-Za-z0-9_.:/-]+")) throw new IllegalArgumentException("Invalid settings argument");
+        return text;
+    }
 
     void await(String description, long timeoutMs, Condition condition) throws Exception {
         long deadline = SystemClock.uptimeMillis() + timeoutMs;
