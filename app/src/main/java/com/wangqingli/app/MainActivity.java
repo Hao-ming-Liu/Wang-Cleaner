@@ -81,7 +81,7 @@ public final class MainActivity extends Activity {
     private void fillApps(LinearLayout list,String query){list.removeAllViews();int count=0;for(AppItem a:apps){if(!(a.name+" "+a.pkg).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT)))continue;count++;
         LinearLayout c=column();c.setPadding(dp(16),dp(14),dp(16),dp(8));c.setBackground(shape(Color.WHITE,18));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(12);list.addView(c,p);
         label(c,a.name,17,INK,true);label(c,a.pkg,11,MUTED,false);
-        toggle(c,"开屏自动跳过","仅进入应用后 12 秒内匹配明确的小型跳过按钮。",store.enabled(a.pkg,"splash"),b->store.set(a.pkg,"splash",b));
+        toggle(c,"开屏自动跳过","仅进入应用后 12 秒内匹配小型按钮；顶部单字“跳过”可识别。",store.enabled(a.pkg,"splash"),b->store.set(a.pkg,"splash",b));
         toggle(c,"取消打开应用提示","只有明确的跨应用打开提示才会点击取消。",store.enabled(a.pkg,"prompt"),b->store.set(a.pkg,"prompt",b));
     }if(count==0)label(list,loading?"正在读取应用列表…":"没有匹配应用；可手工添加包名。",14,MUTED,false);}
     private void addPackage(){EditText input=new EditText(this);input.setHint("例如 com.sankuai.meituan");input.setSingleLine(true);new AlertDialog.Builder(this).setTitle("添加应用包名").setView(input).setNegativeButton("取消",null).setPositiveButton("添加",(d,w)->{String p=input.getText().toString().trim();if(!Store.validPackage(p)){toast("包名格式不正确");return;}store.addPackage(p);loadApps();}).show();}
@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
         rules.addView(button("导出当前规则",()->createDocument(104,"application/json","王清理-规则.json")));
         rules.addView(button("管理广告跳转返回组合",this::returnRules));
         LinearLayout sensor=card();label(sensor,"“摇一摇”的系统限制",17,INK,true);label(sensor,"无障碍不能禁用其他 APP 的加速度计。开发者选项若有 Sensors Off（传感器关闭），它是全局开关，会影响相机、麦克风等；不同系统可能没有该入口。王清理不会自动切换它。",13,MUTED,false);
-        LinearLayout data=card();label(data,"本地与透明",17,INK,true);label(data,"无联网权限 · 无截图/OCR · 无后台轮询 · 无唤醒锁\n读取界面仅用于当次匹配，不记录正文。只有包名、动作类别、规则和时间写入本地数据库。\n\n版本 0.1.0 · Android 8.0+\n参考项目：github.com/gkd-kit/gkd\n独立实现，非 GKD 官方版本。",13,MUTED,false);
+        LinearLayout data=card();label(data,"本地与透明",17,INK,true);label(data,"无联网权限 · 无截图/OCR · 无后台轮询 · 无唤醒锁\n读取界面仅用于当次匹配，不记录正文。只有包名、动作类别、规则和时间写入本地数据库。\n\n版本 1.02 · Android 8.0+\n参考项目：github.com/gkd-kit/gkd\n独立实现，非 GKD 官方版本。",13,MUTED,false);
         data.addView(button("清空全部统计",()->new AlertDialog.Builder(this).setTitle("清空统计？").setMessage("将永久删除每日累计和操作明细，应用开关及规则保留。").setNegativeButton("取消",null).setPositiveButton("清空",(d,w)->{store.clearStats();render();}).show()));
     }
     private void returnRules(){

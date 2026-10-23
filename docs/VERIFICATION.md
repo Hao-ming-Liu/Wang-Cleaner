@@ -1,10 +1,10 @@
-# 验证记录 — 2026-10-23（1.01）
+# 验证记录 — 2026-10-23（1.02）
 
 ## 已完成
 
 - `scripts/build.ps1 -Test`：BUILD SUCCESSFUL。生成主应用、仪器测试、广告测试页及本地落地页 APK。
 - 纯 Java 核心测试：27 passed, 0 failed。
-- `scripts/test-device.ps1`：Android 17 / API 37 模拟器（Medium_Phone，x86_64，16 KB 页）主套件 25 passed, 0 failed，独立进程重启持久化套件 1 passed, 0 failed。
+- `scripts/test-device.ps1`：Android 17 / API 37 模拟器（Medium_Phone，x86_64，16 KB 页）主套件 26 passed, 0 failed，独立进程重启持久化套件 1 passed, 0 failed。新增顶部裸“跳过”按钮（页面无广告文字）自动点击验证。
 - `apksigner verify --verbose`：签名通过，APK v2 签名，调试证书。
 - 上轮已打开首页和应用列表检查布局；本轮实际安装并执行完整服务测试，无崩溃日志。
 
@@ -18,9 +18,9 @@
 
 ## 安装包
 
-主应用：`app/build/outputs/apk/debug/app-debug.apk`，另复制到 `deliverables/Wang-Cleaner-1.01-debug.apk` 方便下载。
+主应用：`app/build/outputs/apk/debug/app-debug.apk`，另复制到 `deliverables/Wang-Cleaner-1.02-debug.apk` 方便下载。
 
-SHA-256：`71EDEB52173FA75A2ACB8F47D083B4D751A361AD671D7F2AEB85573F4C5860F7`。
+SHA-256：`D828B47A8DE2158C955AC0C92F237FD5613A8606BFD8B251C0FB3F44A1561620`。
 
 应用使用 minSdk 26、targetSdk 35；在 Android 17 上完成以上测试。此为调试签名测试版，尚未制作商店发布签名。
 

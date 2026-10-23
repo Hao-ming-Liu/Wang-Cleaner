@@ -34,6 +34,12 @@ final class ServiceTests {
                     () -> hasText(r, SOURCE, "点击次数：1") && r.store.total(false) == 1);
             equal(1L, StoreTests.stat(r.store.stats(false), SOURCE).splash, "Splash attributed to source");
         });
+        r.test("small top bare skip is accepted without separate ad text", () -> {
+            prepare(r);
+            launch(r, "bare_splash");
+            awaitText(r, SOURCE, "开屏已跳过");
+            r.await("bare splash operation recorded", TIMEOUT, () -> r.store.total(false) == 1);
+        });
         r.test("last delayed content event is eventually scanned", () -> {
             prepare(r);
             launch(r, "delayed_splash");

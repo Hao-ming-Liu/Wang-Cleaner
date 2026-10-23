@@ -6,7 +6,7 @@
 
 | 功能 | 当前行为 |
 | --- | --- |
-| 开屏广告 | 用户逐个开启应用保护；进入应用后 12 秒内识别明确的小型跳过按钮，一次前台会话最多成功点击一次 |
+| 开屏广告 | 用户逐个开启应用保护；进入应用后 12 秒内识别小型跳过按钮，顶部单字“跳过”无需额外广告文字，一次前台会话最多成功点击一次 |
 | 打开应用提示 | 对明确“是否打开其他应用”等提示，点击同界面的小型取消按钮 |
 | 广告跳转后返回 | 默认关闭；手工指定来源→目标，在来源开屏窗口内、最近 3 秒见到广告标记时尝试一次返回 |
 | 按 APP 统计 | 今日、累计、动作分类、最近记录、每日 CSV 导出；统计的是系统接受的操作，非视觉确认拦截 |
@@ -19,7 +19,7 @@
 
 ## 安装与首次配置
 
-1. 下载仓库 `deliverables/Wang-Cleaner-1.01-debug.apk` 并安装；这是调试签名测试版本，适合侧载验证。
+1. 下载仓库 `deliverables/Wang-Cleaner-1.02-debug.apk` 并安装；这是调试签名测试版本，适合侧载验证。
 2. 打开王清理，阅读无障碍用途说明，在系统无障碍列表启用王清理。若 Android 提示受限设置，在应用详情中按系统提示允许；菜单位置随 HyperOS 变化。
 3. 在“应用”中打开美团、淘宝、哔哩哔哩需要的保护开关。默认不自动选择任何 APP。
 4. 在系统里允许自启动、后台运行，电池策略设为无限制，并在最近任务中锁定王清理。
@@ -48,7 +48,7 @@ Windows（已有 SDK 与依赖缓存）：
 
 可用 `-JavaHome` 与 `-AndroidSdk` 指定本机路径。脚本默认离线，使用本机 Build Tools 34.0.0 的 aapt2；全新环境须在 Android Studio 安装 SDK 35、Build Tools 34.0.0，并先联网同步 Gradle 依赖。其他平台可配置 `local.properties` 后运行 `./gradlew assembleDebug`。
 
-APK：`deliverables/Wang-Cleaner-1.01-debug.apk`（构建源文件为 `app/build/outputs/apk/debug/app-debug.apk`）。独立测试页面：`fixture/build/outputs/apk/debug/fixture-debug.apk`。
+APK：`deliverables/Wang-Cleaner-1.02-debug.apk`（构建源文件为 `app/build/outputs/apk/debug/app-debug.apk`）。独立测试页面：`fixture/build/outputs/apk/debug/fixture-debug.apk`。
 
 ```powershell
 .\scripts\test-core.ps1 -JavaHome '你的JDK目录'

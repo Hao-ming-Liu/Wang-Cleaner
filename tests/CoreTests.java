@@ -15,10 +15,10 @@ public final class CoreTests {
             yes(splash("Skip ad", null, null, false, true, true, true));
             yes(splash(null, "跳过广告", null, true, true, true, false));
         });
-        test("generic skip requires top region and explicit advertising", () -> {
-            no(splash("跳过", null, null, true, true, true, false));
-            no(splash("跳过", null, null, false, true, true, true));
-            yes(splash("跳过", null, null, true, true, true, true));
+        test("bare skip is allowed only on a small top splash button or with ad evidence", () -> {
+            yes(splash("跳过", null, null, true, true, true, false));
+            yes(splash("跳过", null, null, false, true, true, true));
+            no(splash("跳过", null, null, false, true, true, false));
         });
         test("reject oversized, nonclickable, and context-free candidates", () -> {
             no(splash("跳过广告", null, null, true, false, true, true));

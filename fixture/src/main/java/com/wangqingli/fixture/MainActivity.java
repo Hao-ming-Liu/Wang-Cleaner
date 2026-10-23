@@ -57,7 +57,7 @@ public final class MainActivity extends Activity {
         if ("splash".equals(scenario) || "prompt".equals(scenario)
                 || "negative".equals(scenario) || "delayed_splash".equals(scenario)
                 || "splash_sticky".equals(scenario) || "ad_link".equals(scenario)
-                || "no_ad_link".equals(scenario)) {
+                || "no_ad_link".equals(scenario) || "bare_splash".equals(scenario)) {
             clicks = 0;
             return scenario;
         }
@@ -82,6 +82,9 @@ public final class MainActivity extends Activity {
             case "splash":
             case "splash_sticky":
                 splash(root);
+                break;
+            case "bare_splash":
+                bareSplash(root);
                 break;
             case "delayed_splash":
                 result(root, "正在准备测试页面", "测试按钮将在一次内容更新后出现。");
@@ -163,6 +166,15 @@ public final class MainActivity extends Activity {
         LinearLayout content = centeredContent(root);
         content.addView(message("开屏广告测试\n\n右上方为明确跳过按钮。\n“5s”为固定测试文案，不会自动结束。"));
         if (sticky) content.addView(message("点击次数：" + clicks));
+    }
+
+    private void bareSplash(LinearLayout root) {
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        top.addView(button("跳过", R.id.splash_skip, () -> show("skipped")),
+                new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)));
+        root.addView(top);
+        centeredContent(root).addView(message("启动页面没有额外广告文字；用于验证顶部单字跳过按钮。"));
     }
 
     private void prompt(LinearLayout root) {

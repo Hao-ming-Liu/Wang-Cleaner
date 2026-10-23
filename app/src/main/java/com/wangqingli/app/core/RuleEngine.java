@@ -19,7 +19,8 @@ public final class RuleEngine {
      * Checks visible text and accessibility descriptions as complete labels.
      * A resource ID is deliberately insufficient to infer a safe click.
      * The caller must supply size/clickability from the actual click target.
-     * Bare 跳过 needs both top placement and independent advertising evidence.
+     * Bare 跳过 is accepted for a small top-region button during the caller's
+     * short splash window, or elsewhere only when independent ad evidence exists.
      */
     public static boolean isSplashCandidate(String text, String description, String resourceId,
             boolean topRegion, boolean small, boolean clickable, boolean adEvidence) {
@@ -30,7 +31,7 @@ public final class RuleEngine {
 
     private static boolean splashLabel(String value, boolean topRegion, boolean adEvidence) {
         String label = normalized(value);
-        if ("跳过".equals(label)) return topRegion && adEvidence;
+        if ("跳过".equals(label)) return topRegion || adEvidence;
         return SPLASH_LABEL.matcher(label).matches();
     }
 
