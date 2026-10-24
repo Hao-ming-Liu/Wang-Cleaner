@@ -5,9 +5,13 @@ import java.util.regex.Pattern;
 
 /** Conservative, Android-independent recognition of explicit advertising UI. */
 public final class RuleEngine {
-    private static final String SECONDS = "(?:[0-9]|[12][0-9]|30)\\s*(?:s|秒)";
+    private static final String COUNT = "(?:[0-9]|[12][0-9]|30)";
+    private static final String SECONDS = COUNT + "\\s*(?:s|秒)";
     private static final Pattern SPLASH_LABEL = Pattern.compile(
-            "(?:跳过广告|跳过\\s*" + SECONDS + "|" + SECONDS + "\\s*跳过|skip\\s+ad)");
+            "(?:跳过广告|跳过\\s*" + SECONDS + "|" + SECONDS + "\\s*跳过|"
+            + "跳过\\s+" + COUNT + "|" + COUNT + "\\s+跳过|"
+            + "跳过\\s*\\(\\s*" + SECONDS + "\\s*\\)|"
+            + "跳过\\s*\\|\\s*" + SECONDS + "|skip\\s+ad)");
     private static final Pattern AD_LABEL = Pattern.compile(
             "(?:广告|广告\\s*剩余|广告\\s*(?:剩余\\s*)?" + SECONDS + "|ad|advertisement|sponsored)");
     private static final Pattern JUMP_PROMPT = Pattern.compile(
@@ -51,6 +55,13 @@ public final class RuleEngine {
         return "取消".equals(label) || "留在当前应用".equals(label)
                 || "暂不".equals(label) || "暂不开启".equals(label)
                 || "cancel".equals(label);
+    }
+
+    /** Built-in popup closes must name the ad explicitly. */
+    public static boolean isPopupClose(String text) {
+        String label = normalized(text);
+        return "关闭广告".equals(label) || "关闭此广告".equals(label)
+                || "close ad".equals(label) || "dismiss ad".equals(label);
     }
 
     /**

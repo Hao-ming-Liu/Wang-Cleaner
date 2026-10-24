@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item name="popup_close" type="id" />
     <item name="screen_title" type="id" />
     <item name="screen_message" type="id" />
     <item name="splash_skip" type="id" />

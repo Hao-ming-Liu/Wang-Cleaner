@@ -51,17 +51,18 @@ public final class MainActivity extends Activity {
     private boolean authorized(){AccessibilityManager m=(AccessibilityManager)getSystemService(ACCESSIBILITY_SERVICE);for(AccessibilityServiceInfo info:m.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)){ServiceInfo s=info.getResolveInfo().serviceInfo;if(s.packageName.equals(getPackageName()))return true;}return false;}
     private String status(){if(!store.enabled())return "保护已暂停";if(GuardService.connected)return "无障碍已连接";return authorized()?"已授权 · 等待系统连接":"等待开启无障碍";}
     private void home(){
-        LinearLayout hero=card();hero.setBackground(shape(GREEN,22));label(hero,"●  "+status(),18,Color.WHITE,true);label(hero,"只处理你选择的应用",13,0xffd4e7de,false);
+        LinearLayout hero=card();hero.setBackground(shape(GREEN,22));label(hero,"●  "+status(),18,Color.WHITE,true);label(hero,store.prefs.getBoolean("allApps",false)?"尝试保护符合条件的应用":"只处理你选择的应用",13,0xffd4e7de,false);
         TextView count=text(String.valueOf(store.total(false)),52,Color.WHITE,true);hero.addView(count);label(hero,"累计成功发出的保护操作",12,0xffd4e7de,false);
         LinearLayout c=card();toggle(c,"启用保护","暂停后不再扫描或自动操作，统计仍会保留。",store.enabled(),b->{store.prefs.edit().putBoolean("enabled",b).apply();render();});
+        toggle(c,"保护所有应用","默认关闭。开启后，对未单独设置的应用尝试识别开屏、广告弹窗和打开应用提示；应用页可单独关闭。系统授权界面、桌面和输入法等由服务排除。",store.prefs.getBoolean("allApps",false),b->{store.prefs.edit().putBoolean("allApps",b).apply();render();});
         c.addView(button(GuardService.connected?"检查无障碍设置":"开启无障碍服务",this::accessibilityConsent));
         c.addView(button("选择需要保护的应用",()->{tab=1;render();}));
-        LinearLayout summary=card();label(summary,"今天已执行  "+store.total(true)+"  次",20,INK,true);label(summary,"开屏跳过 · 取消打开提示 · 跳转后返回",13,MUTED,false);
+        LinearLayout summary=card();label(summary,"今天已执行  "+store.total(true)+"  次",20,INK,true);label(summary,"开屏跳过 · 关闭广告弹窗 · 取消打开提示 · 跳转后返回",13,MUTED,false);
         label(summary,"次数代表 Android 接受了操作，不代表广告已视觉确认消失。失败操作不计数。",12,MUTED,false);
         LinearLayout limit=card();label(limit,"关于“摇一摇”广告",17,INK,true);label(limit,"可尽快跳过可识别的开屏，并按指定规则在广告跳转后尝试返回。无 root 无障碍不能禁止其他应用读取加速度传感器，也不能通用拦截跳转。",14,MUTED,false);
         if(!store.prefs.getString("lastError","").isEmpty())label(limit,store.prefs.getString("lastError",""),13,0xffa1452c,false);
     }
-    private void accessibilityConsent(){new AlertDialog.Builder(this).setTitle("启用前请了解权限用途").setMessage("王清理需要查看已选应用的界面文字和按钮，并代你点击跳过、取消，或按规则返回。\n\n界面内容只在内存中匹配，不保存或上传；本应用没有联网权限。不读取密码节点。\n\n你可随时暂停保护或在系统设置撤销无障碍。Android 13 及以上可能需要先在应用详情中允许受限制的设置。") .setNegativeButton("暂不开启",null).setPositiveButton("了解，前往设置",(d,w)->open(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))).show();}
+    private void accessibilityConsent(){new AlertDialog.Builder(this).setTitle("启用前请了解权限用途").setMessage("王清理需要查看保护范围内应用的界面文字和按钮，并代你点击跳过、关闭广告弹窗、取消，或按规则返回。\n\n界面内容只在内存中匹配，不保存或上传；本应用没有联网权限。不读取密码节点。\n\n你可随时暂停保护或在系统设置撤销无障碍。Android 13 及以上可能需要先在应用详情中允许受限制的设置。") .setNegativeButton("暂不开启",null).setPositiveButton("了解，前往设置",(d,w)->open(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))).show();}
     private void loadApps(){if(loading)return;loading=true;io.execute(()->{
         Map<String,String> map=new TreeMap<>();Intent launch=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         for(ResolveInfo r:getPackageManager().queryIntentActivities(launch,0)){String p=r.activityInfo.packageName;if(!p.equals(getPackageName()))map.put(p,r.loadLabel(getPackageManager()).toString());}
@@ -73,7 +74,7 @@ public final class MainActivity extends Activity {
     private int priority(String p){return p.equals("com.sankuai.meituan")?0:p.equals("com.taobao.taobao")?1:p.equals("tv.danmaku.bili")?2:3;}
     private String appName(String p){try{return getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(p,0)).toString();}catch(PackageManager.NameNotFoundException e){return p;}}
     private void applications(){
-        label(page,"按应用开启保护",22,INK,true);label(page,"优先展示美团、淘宝、哔哩哔哩（若已安装）。应用更新可能改变按钮结构，规则效果以实机为准。",13,MUTED,false);
+        label(page,"按应用设置保护",22,INK,true);label(page,"全应用保护开启时，此处的开关可单独关闭应用或类别。优先展示美团、淘宝、哔哩哔哩（若已安装）。规则效果以实机为准。",13,MUTED,false);
         EditText search=new EditText(this);search.setSingleLine(true);search.setHint("搜索应用名称或包名");page.addView(search);
         LinearLayout list=column();page.addView(list);fillApps(list,"");search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){fillApps(list,s.toString());}public void afterTextChanged(android.text.Editable e){}});
         page.addView(button("添加包名",this::addPackage));page.addView(button("刷新应用列表",this::loadApps));
@@ -83,22 +84,29 @@ public final class MainActivity extends Activity {
         label(c,a.name,17,INK,true);label(c,a.pkg,11,MUTED,false);
         toggle(c,"开屏自动跳过","仅进入应用后 12 秒内匹配小型按钮；顶部单字“跳过”可识别。",store.enabled(a.pkg,"splash"),b->store.set(a.pkg,"splash",b));
         toggle(c,"取消打开应用提示","只有明确的跨应用打开提示才会点击取消。",store.enabled(a.pkg,"prompt"),b->store.set(a.pkg,"prompt",b));
+        toggle(c,"关闭广告弹窗","识别明确的广告关闭按钮；普通关闭按钮不会作为广告处理。",store.enabled(a.pkg,"popup"),b->store.set(a.pkg,"popup",b));
     }if(count==0)label(list,loading?"正在读取应用列表…":"没有匹配应用；可手工添加包名。",14,MUTED,false);}
     private void addPackage(){EditText input=new EditText(this);input.setHint("例如 com.sankuai.meituan");input.setSingleLine(true);new AlertDialog.Builder(this).setTitle("添加应用包名").setView(input).setNegativeButton("取消",null).setPositiveButton("添加",(d,w)->{String p=input.getText().toString().trim();if(!Store.validPackage(p)){toast("包名格式不正确");return;}store.addPackage(p);loadApps();}).show();}
     private void statistics(){
         label(page,"每一次，都有记录",22,INK,true);LinearLayout filter=new LinearLayout(this);filter.addView(button(today?"查看累计":"查看今天",()->{today=!today;render();}));filter.addView(button("刷新",this::render));page.addView(filter);
         List<Store.Stat> stats=store.stats(today);long max=stats.isEmpty()?1:stats.get(0).total();
         if(stats.isEmpty()){LinearLayout empty=card();label(empty,"还没有保护记录",20,INK,true);label(empty,"在应用页选择 APP 并开启无障碍后，实际成功发出的操作会显示在这里。",14,MUTED,false);}
-        for(Store.Stat s:stats){LinearLayout c=card();label(c,appName(s.pkg)+"   "+s.total()+" 次",18,INK,true);label(c,s.pkg,11,MUTED,false);ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgress((int)(s.total()*100/max));bar.setProgressTintList(android.content.res.ColorStateList.valueOf(GREEN));c.addView(bar,new LinearLayout.LayoutParams(-1,dp(5)));label(c,"跳过 "+s.splash+"  ·  取消提示 "+s.prompt+"  ·  返回 "+s.back,12,MUTED,false);}
+        for(Store.Stat s:stats){LinearLayout c=card();label(c,appName(s.pkg)+"   "+s.total()+" 次",18,INK,true);label(c,s.pkg,11,MUTED,false);ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(100);bar.setProgress((int)(s.total()*100/max));bar.setProgressTintList(android.content.res.ColorStateList.valueOf(GREEN));c.addView(bar,new LinearLayout.LayoutParams(-1,dp(5)));label(c,"跳过 "+s.splash+"  ·  广告弹窗 "+s.popup+"  ·  取消提示 "+s.prompt+"  ·  返回 "+s.back,12,MUTED,false);}
         page.addView(button("导出每日统计 CSV",()->createDocument(102,"text/csv","王清理-统计.csv")));
         LinearLayout history=card();label(history,"最近操作",18,INK,true);for(String[] row:store.history()){String time=new SimpleDateFormat("MM-dd HH:mm:ss",Locale.CHINA).format(new Date(Long.parseLong(row[0])));label(history,time+"  "+appName(row[1])+"\n"+kindName(row[2])+" · "+row[3],12,MUTED,false);}label(history,"最近明细最多保留 300 条；每日累计保留至手动清空。",11,MUTED,false);
     }
-    private String kindName(String k){return k.equals("splash")?"开屏跳过":k.equals("prompt")?"取消打开提示":"跳转后返回";}
+    private String kindName(String k){return k.equals("splash")?"开屏跳过":k.equals("prompt")?"取消打开提示":k.equals("popup")?"关闭广告弹窗":"跳转后返回";}
     private void settings(){
         label(page,"运行与规则",22,INK,true);
         LinearLayout status=card();label(status,status(),18,INK,true);label(status,"系统授权："+(authorized()?"已开启":"未开启")+"\n服务连接："+(GuardService.connected?"已连接":"未连接")+"\n电池优化："+(((PowerManager)getSystemService(POWER_SERVICE)).isIgnoringBatteryOptimizations(getPackageName())?"已豁免":"由系统管理"),13,MUTED,false);
         status.addView(button("刷新状态",this::render));status.addView(button("无障碍设置",this::accessibilityConsent));status.addView(button("电池优化设置",()->open(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))));status.addView(button("应用详情 / 后台与自启动",()->open(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))));
         toggle(status,"开机后提醒检查","需要通知权限；提醒不代表服务已恢复。",store.prefs.getBoolean("bootReminder",false),b->{store.prefs.edit().putBoolean("bootReminder",b).apply();if(b&&Build.VERSION.SDK_INT>=33)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);});
+        LinearLayout diagnostics=card();label(diagnostics,"两分钟扫描诊断",18,INK,true);
+        label(diagnostics,"临时记录包名、事件和拒绝阶段，用来区分没有匹配和操作失败；不记录页面文字或按钮 ID，结束后仅留在内存中。",13,MUTED,false);
+        diagnostics.addView(button("开始两分钟诊断",()->{GuardService.diagnostics.start(SystemClock.elapsedRealtime());toast("诊断已开始，约两分钟后自动结束");}));
+        diagnostics.addView(button("查看诊断",()->new AlertDialog.Builder(this).setTitle("扫描诊断").setMessage(GuardService.diagnostics.report(SystemClock.elapsedRealtime())).setPositiveButton("关闭",null).show()));
+        diagnostics.addView(button("复制诊断",()->{String report=GuardService.diagnostics.report(SystemClock.elapsedRealtime());ClipboardManager clipboard=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);clipboard.setPrimaryClip(ClipData.newPlainText("王清理扫描诊断",report));toast("诊断已复制");}));
+        diagnostics.addView(button("停止诊断",()->{GuardService.diagnostics.stop();toast("诊断已停止，报告仍可查看");}));
         LinearLayout xiaomi=card();label(xiaomi,"小米 / HyperOS 运行建议",17,INK,true);label(xiaomi,"1. 在系统设置中允许王清理自启动和后台运行。\n2. 将王清理的电池策略设为无限制（实际菜单名称随系统变化）。\n3. 在最近任务中锁定王清理。\n4. 重启后打开本页确认“服务已连接”。\n\n清理最近任务与“强行停止”不同。厂商仍可终止服务，强行停止后请手动打开并检查无障碍。",13,MUTED,false);
         LinearLayout rules=card();label(rules,"本地规则",18,INK,true);label(rules,"借鉴 GKD 的按应用匹配思路。使用王清理 JSON v1 格式，不直接兼容 GKD 订阅；导入会替换现有本地规则和返回组合。",13,MUTED,false);
         label(rules,"同一应用和类型存在本地规则时，只执行已开启且匹配的本地规则；即使全部停用，也不会回退内置规则。",12,MUTED,false);
@@ -107,9 +115,10 @@ public final class MainActivity extends Activity {
         rules.addView(button("导出当前规则",()->createDocument(104,"application/json","王清理-规则.json")));
         rules.addView(button("管理广告跳转返回组合",this::returnRules));
         LinearLayout sensor=card();label(sensor,"“摇一摇”的系统限制",17,INK,true);label(sensor,"无障碍不能禁用其他 APP 的加速度计。开发者选项若有 Sensors Off（传感器关闭），它是全局开关，会影响相机、麦克风等；不同系统可能没有该入口。王清理不会自动切换它。",13,MUTED,false);
-        LinearLayout data=card();label(data,"本地与透明",17,INK,true);label(data,"无联网权限 · 无截图/OCR · 无后台轮询 · 无唤醒锁\n读取界面仅用于当次匹配，不记录正文。只有包名、动作类别、规则和时间写入本地数据库。\n\n版本 1.02 · Android 8.0+\n参考项目：github.com/gkd-kit/gkd\n独立实现，非 GKD 官方版本。",13,MUTED,false);
+        LinearLayout data=card();label(data,"本地与透明",17,INK,true);label(data,"无联网权限 · 无截图/OCR · 无后台轮询 · 无唤醒锁\n读取界面仅用于当次匹配，不记录正文。只有包名、动作类别、规则和时间写入本地数据库。\n\n版本 "+versionName()+" · Android 8.0+\n参考项目：github.com/gkd-kit/gkd\n独立实现，非 GKD 官方版本。",13,MUTED,false);
         data.addView(button("清空全部统计",()->new AlertDialog.Builder(this).setTitle("清空统计？").setMessage("将永久删除每日累计和操作明细，应用开关及规则保留。").setNegativeButton("取消",null).setPositiveButton("清空",(d,w)->{store.clearStats();render();}).show()));
     }
+    private String versionName(){try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(PackageManager.NameNotFoundException e){return "未知";}}
     private void returnRules(){
         LinearLayout layout=column();layout.setPadding(dp(20),dp(8),dp(20),dp(8));
         label(layout,"只有来源开屏前 12 秒、最近 3 秒看到广告证据，并切换至指定目标时才尝试返回一次。可能已短暂打开目标。支付、登录等正常跳转也可能被误判，请谨慎配置。",13,MUTED,false);

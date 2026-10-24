@@ -67,6 +67,7 @@ Push-Location -LiteralPath $projectRoot
 try {
     if ($Test) {
         & (Join-Path $PSScriptRoot 'test-core.ps1') -JavaHome $env:JAVA_HOME
+        & (Join-Path $PSScriptRoot 'test-diagnostics.ps1') -JavaHome $env:JAVA_HOME
     }
     $gradleTasks = @(':app:assembleDebug', ':fixture:assembleDebug')
     if ($Test) { $gradleTasks += @(':app:assembleDebugAndroidTest', ':fixture:assembleLanding') }

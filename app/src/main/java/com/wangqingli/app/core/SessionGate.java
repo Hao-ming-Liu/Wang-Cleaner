@@ -98,6 +98,14 @@ public final class SessionGate {
         if (valid(key)) actions.put(key, now);
     }
 
+    /** Delay for a received candidate suppressed only by the action cooldown. */
+    public long remainingActionDelay(String key, long now) {
+        Long last = actions.get(key);
+        if (last == null) return 0;
+        if (now < last.longValue()) return ACTION_COOLDOWN_MS;
+        return Math.max(0, ACTION_COOLDOWN_MS - (now - last.longValue()));
+    }
+
     /** Consumes the previous source's single return allowance after success. */
     public void returned() {
         if (previous != null) previous.returned = true;

@@ -2,6 +2,15 @@
   "version": 1,
   "rules": [
     {
+      "id": "fixture-popup-close",
+      "package": "com.wangqingli.fixture",
+      "kind": "popup",
+      "activity": "com.wangqingli.fixture.MainActivity",
+      "context": "优惠推广",
+      "viewId": "com.wangqingli.fixture:id/popup_close",
+      "enabled": true
+    },
+    {
       "id": "fixture-explicit-skip",
       "package": "com.wangqingli.fixture",
       "kind": "splash",

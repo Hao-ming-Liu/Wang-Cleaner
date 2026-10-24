@@ -21,6 +21,7 @@ final class StoreTests {
             check(r.store.enabled(), "Global default is enabled");
             check(!r.store.enabled(SOURCE, "splash"), "Splash requires opt-in");
             check(!r.store.enabled(SOURCE, "prompt"), "Prompts require opt-in");
+            check(!r.store.enabled(SOURCE, "popup"), "Popups require opt-in by default");
             r.store.set(SOURCE, "splash", true);
             r.store.set(SOURCE, "prompt", false);
             r.store.addPackage(TARGET);
@@ -33,6 +34,23 @@ final class StoreTests {
             check(r.store.packages().contains(TARGET), "Returned package sets cannot mutate saved configuration");
             r.store.prefs.edit().putBoolean("enabled", false).commit();
             check(!r.store.enabled(), "Global pause persists");
+        });
+        r.test("all-app mode supplies defaults but explicit package choices win", () -> {
+            reset(r);
+            check(!r.store.prefs.getBoolean("allApps", false), "All-app mode defaults off");
+            r.store.prefs.edit().putBoolean("allApps", true).commit();
+            for (String kind : new String[]{"splash", "prompt", "popup"})
+                check(r.store.enabled(SOURCE, kind), kind + " inherits all-app mode");
+            r.store.set(SOURCE, "popup", false);
+            r.store.set(SOURCE, "splash", false);
+            r.store.set(OTHER, "popup", false);
+            check(!r.store.enabled(SOURCE, "popup") && !r.store.enabled(SOURCE, "splash"), "Explicit false overrides global mode");
+            check(r.store.enabled(SOURCE, "prompt") && r.store.enabled(TARGET, "popup"), "Unconfigured kinds and apps inherit global mode");
+            check(r.store.packages().contains(OTHER), "Popup-only preference contributes to app list");
+            r.store.prefs.edit().putBoolean("allApps", false).commit();
+            check(!r.store.enabled(TARGET, "prompt"), "Disabling all-app mode removes inherited opt-in");
+            r.store.set(TARGET, "popup", true);
+            check(r.store.enabled(TARGET, "popup"), "Explicit true survives global mode change");
         });
         r.test("valid rules retain exact selectors and explicit return opt-in", () -> {
             reset(r);
@@ -73,6 +91,26 @@ final class StoreTests {
             reject(r, document().put("returns", new JSONArray().put(returnRule(true).put("source", "com.wangqingli.app"))).toString());
             reject(r, document().put("returns", new JSONArray().put(returnRule(true).put("target", "com.wangqingli.app"))).toString());
         });
+        r.test("popup rules require scoped activity and context as well as selector", () -> {
+            reset(r);
+            JSONObject popup = rule("popup-safe", "popup").put("activity", SOURCE + ".MainActivity")
+                    .put("context", "广告");
+            r.store.importRules(document().put("rules", new JSONArray().put(popup)).toString());
+            equal("popup", r.store.rules().get(0).kind, "Popup rule accepted");
+            JSONObject byId = new JSONObject(popup.toString());
+            byId.remove("text");
+            byId.put("viewId", SOURCE + ":id/ad_close");
+            r.store.importRules(document().put("rules", new JSONArray().put(byId)).toString());
+            rejectRules(r, new JSONArray().put(new JSONObject(popup.toString()).put("activity", "")));
+            rejectRules(r, new JSONArray().put(new JSONObject(popup.toString()).put("context", "")));
+            rejectRules(r, new JSONArray().put(new JSONObject(popup.toString()).put("activity", " ")));
+            rejectRules(r, new JSONArray().put(new JSONObject(popup.toString()).put("context", " ")));
+            JSONObject noSelector = new JSONObject(popup.toString());
+            noSelector.remove("text");
+            rejectRules(r, new JSONArray().put(noSelector));
+            rejectRules(r, new JSONArray().put(new JSONObject(popup.toString()).put("viewId", OTHER + ":id/close")));
+            rejectRules(r, new JSONArray().put(new JSONObject(popup.toString()).put("context", repeat('x', 201))));
+        });
         r.test("rule count and field boundaries reject overflow without partial saving", () -> {
             reset(r);
             JSONObject doc = document();
@@ -103,17 +141,19 @@ final class StoreTests {
             r.store.record(SOURCE, "splash", "second");
             r.store.record(SOURCE, "prompt", "cancel");
             r.store.record(SOURCE, "back", "return");
+            r.store.record(SOURCE, "popup", "ad-close");
             r.store.record(TARGET, "prompt", "target");
             r.store.getWritableDatabase().execSQL("INSERT INTO daily(day,pkg,kind,n) VALUES('2000-01-01',?,'splash',4)", new Object[]{SOURCE});
-            equal(5L, r.store.total(true), "Today's accepted operations");
-            equal(9L, r.store.total(false), "Previous days included only in all-time count");
+            equal(6L, r.store.total(true), "Today's accepted operations");
+            equal(10L, r.store.total(false), "Previous days included only in all-time count");
             List<Store.Stat> today = r.store.stats(true);
             equal(2, today.size(), "Both apps included");
             Store.Stat source = stat(today, SOURCE);
             equal(2L, source.splash, "Splash count");
             equal(1L, source.prompt, "Prompt count");
             equal(1L, source.back, "Return count");
-            equal(4L, source.total(), "Source total");
+            equal(1L, source.popup, "Popup count");
+            equal(5L, source.total(), "Source total");
             equal(6L, stat(r.store.stats(false), SOURCE).splash, "All-time source splash count");
             equal(TARGET, r.store.history().get(0)[1], "History newest first");
             check(r.store.csv().startsWith("\uFEFFdate,package,action,count\r\n"), "CSV header and BOM");
@@ -155,8 +195,9 @@ final class StoreTests {
 
     static void seedPersistence(DeviceTestRunner r) throws Exception {
         reset(r);
-        r.store.prefs.edit().putBoolean("enabled", false).putBoolean("splash:" + SOURCE, true)
-                .putBoolean("prompt:" + SOURCE, false).commit();
+        r.store.prefs.edit().putBoolean("enabled", false).putBoolean("allApps", true)
+                .putBoolean("splash:" + SOURCE, true).putBoolean("prompt:" + SOURCE, false)
+                .putBoolean("popup:" + SOURCE, false).commit();
         r.store.addPackage(TARGET);
         r.store.importRules(document().put("rules", new JSONArray().put(rule("persisted-rule", "splash")))
                 .put("returns", new JSONArray().put(returnRule(true))).toString());
@@ -170,7 +211,9 @@ final class StoreTests {
         check(r.store.prefs.getInt("testSeedProcess", -1) > 0, "Seed process exists");
         check(r.store.prefs.getInt("testSeedProcess", -1) != android.os.Process.myPid(), "Verification runs in a new process");
         check(!r.store.enabled(), "Global pause survived restart");
+        check(r.store.prefs.getBoolean("allApps", false), "All-app preference survived restart");
         check(r.store.enabled(SOURCE, "splash") && !r.store.enabled(SOURCE, "prompt"), "Package preferences survived restart");
+        check(!r.store.enabled(SOURCE, "popup") && r.store.enabled(TARGET, "popup"), "Explicit popup opt-out survived global default");
         check(r.store.packages().contains(TARGET), "Manual package survived restart");
         equal("persisted-rule", r.store.rules().get(0).id, "Imported rule survived restart");
         check(r.store.returnAllowed(SOURCE, TARGET), "Return rule survived restart");

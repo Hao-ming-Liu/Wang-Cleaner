@@ -1,6 +1,7 @@
 package com.wangqingli.fixture;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -10,6 +11,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -26,6 +28,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        updateHomeHandler(getIntent());
         getWindow().setStatusBarColor(Color.rgb(239, 244, 248));
         getWindow().setNavigationBarColor(Color.rgb(239, 244, 248));
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
@@ -37,7 +40,17 @@ public final class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        updateHomeHandler(intent);
         show(scenarioFrom(intent));
+    }
+
+    private void updateHomeHandler(Intent intent) {
+        if (intent != null && intent.hasExtra("testHome")) getPackageManager().setComponentEnabledSetting(
+                new android.content.ComponentName(this, "com.wangqingli.fixture.TestHome"),
+                intent.getBooleanExtra("testHome", false)
+                        ? android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        : android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP);
     }
 
     @Override
@@ -57,7 +70,11 @@ public final class MainActivity extends Activity {
         if ("splash".equals(scenario) || "prompt".equals(scenario)
                 || "negative".equals(scenario) || "delayed_splash".equals(scenario)
                 || "splash_sticky".equals(scenario) || "ad_link".equals(scenario)
-                || "no_ad_link".equals(scenario) || "bare_splash".equals(scenario)) {
+                || "no_ad_link".equals(scenario) || "bare_splash".equals(scenario)
+                || "popup_ad".equals(scenario) || "popup_plain".equals(scenario)
+                || "popup_rule".equals(scenario) || "popup_wait".equals(scenario)
+                || "dense_splash".equals(scenario) || "popup_dialog".equals(scenario)
+                || "popup_rejected".equals(scenario)) {
             clicks = 0;
             return scenario;
         }
@@ -79,6 +96,56 @@ public final class MainActivity extends Activity {
         });
         root.setBackgroundColor(Color.rgb(247, 249, 252));
         switch (screen) {
+            case "popup_rejected":
+                root.addView(title("拒绝点击测试"));
+                LinearLayout rejected = centeredContent(root);
+                for (int i=0;i<2;i++) {
+                    Button control = new Button(this) {
+                        @Override public boolean performAccessibilityAction(int action, Bundle args) {
+                            if (action == android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK) return false;
+                            return super.performAccessibilityAction(action,args);
+                        }
+                    };
+                    control.setText("关闭广告");
+                    control.setOnClickListener(v -> show("popup_closed"));
+                    rejected.addView(control,new LinearLayout.LayoutParams(dp(120),dp(48)));
+                }
+                break;
+            case "popup_dialog":
+                result(root, "弹窗宿主页", "广告将在独立的小窗口中展示。");
+                handler.postDelayed(() -> {
+                    if (generation == pageGeneration) new AlertDialog.Builder(this)
+                            .setTitle("广告弹窗").setPositiveButton("关闭广告", (d, w) -> show("popup_closed")).show();
+                }, 350);
+                break;
+            case "dense_splash":
+                FrameLayout layers = new FrameLayout(this);
+                FrameLayout deepest = layers;
+                for (int i = 0; i < 200; i++) {
+                    FrameLayout wrapper = new FrameLayout(this);
+                    wrapper.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+                    deepest.addView(wrapper, new FrameLayout.LayoutParams(-1, -1));
+                    deepest = wrapper;
+                }
+                deepest.addView(button("跳过", R.id.splash_skip, () -> show("skipped")),
+                        new FrameLayout.LayoutParams(dp(90), dp(48), Gravity.TOP | Gravity.RIGHT));
+                root.addView(layers, new LinearLayout.LayoutParams(-1, -1));
+                break;
+            case "popup_wait":
+                result(root, "等待弹窗", "12.5秒后显示弹窗，不在开屏时间窗内。");
+                handler.postDelayed(() -> { if (generation == pageGeneration) show("popup_ad"); }, 12500);
+                break;
+            case "popup_ad":
+            case "popup_plain":
+            case "popup_rule":
+                root.addView(title("popup_rule".equals(screen) ? "优惠推广" : "弹窗测试"));
+                centeredContent(root).addView(button("popup_ad".equals(screen) ? "关闭广告" : "关闭",
+                        R.id.popup_close, () -> show("popup_closed")),
+                        new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)));
+                break;
+            case "popup_closed":
+                result(root, "弹窗已关闭", "关闭按钮收到点击。");
+                break;
             case "splash":
             case "splash_sticky":
                 splash(root);

@@ -15,6 +15,16 @@ public final class CoreTests {
             yes(splash("Skip ad", null, null, false, true, true, true));
             yes(splash(null, "跳过广告", null, true, true, true, false));
         });
+        test("short whole-label splash countdown variants", () -> {
+            for (String label : new String[] {"跳过 5", "5 跳过", "跳过(5s)", "跳过 | 5秒", "跳过 0", "30 跳过"})
+                yes(splash(label, null, null, true, true, true, false));
+            for (String label : new String[] {"跳过 31", "99 跳过", "跳过(99s)", "跳过 | 100秒", "请跳过 5", "跳过 5 后继续"})
+                no(splash(label, null, null, true, true, true, true));
+        });
+        test("popup labels require explicit ad wording", () -> {
+            for (String label : new String[] {"关闭广告", "关闭此广告", "Close ad", "Dismiss ad"}) yes(rule("isPopupClose", label));
+            for (String label : new String[] {"关闭", "X", "×", "跳过广告", "Close", "关闭窗口", "Dismiss", "Don't close ad", null}) no(rule("isPopupClose", label));
+        });
         test("bare skip is allowed only on a small top splash button or with ad evidence", () -> {
             yes(splash("跳过", null, null, true, true, true, false));
             yes(splash("跳过", null, null, false, true, true, true));
@@ -244,6 +254,16 @@ public final class CoreTests {
             g.enter("target", 5);
             no(g.canReturn("source", "target", 6));
         });
+        test("candidate cooldown retry keeps its deadline across repeated checks", () -> {
+            Gate g = new Gate();
+            equal(0L, g.actionDelay("skip", 1));
+            g.acted("skip", 100);
+            equal(2000L, g.actionDelay("skip", 99));
+            equal(1900L, g.actionDelay("skip", 200));
+            equal(1L, g.actionDelay("skip", 2099));
+            equal(0L, g.actionDelay("skip", 2100));
+            yes(g.canAct("skip", 2100));
+        });
         test("missing package entry clears session attribution", () -> {
             Gate g = new Gate();
             g.enter("source", 0);
@@ -316,6 +336,7 @@ public final class CoreTests {
         void ad(String p, long now) { c("markAd", new Class<?>[] {String.class, long.class}, p, now); }
         boolean canReturn(String from, String to, long now) { return (Boolean) c("canReturn", new Class<?>[] {String.class, String.class, long.class}, from, to, now); }
         boolean canAct(String key, long now) { return (Boolean) c("canAct", new Class<?>[] {String.class, long.class}, key, now); }
+        long actionDelay(String key, long now) { return (Long) c("remainingActionDelay", new Class<?>[] {String.class, long.class}, key, now); }
         void acted(String key, long now) { c("acted", new Class<?>[] {String.class, long.class}, key, now); }
         boolean handled() { return (Boolean) c("splashHandled", new Class<?>[0]); }
         void markHandled() { c("markSplashHandled", new Class<?>[0]); }

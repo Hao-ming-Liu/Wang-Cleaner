@@ -14,5 +14,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity-alias android:name=".TestHome" android:targetActivity="com.wangqingli.fixture.MainActivity"
+            android:enabled="false" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" /></intent-filter>
+        </activity-alias>
     </application>
 </manifest>

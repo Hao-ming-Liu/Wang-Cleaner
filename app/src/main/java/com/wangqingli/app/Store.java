@@ -23,11 +23,14 @@ public final class Store extends SQLiteOpenHelper {
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldV,int newV) { }
     public boolean enabled() { return prefs.getBoolean("enabled", true); }
-    public boolean enabled(String pkg,String kind) { return prefs.getBoolean(kind+":"+pkg,false); }
+    public boolean enabled(String pkg,String kind) {
+        boolean allApps=(kind.equals("splash")||kind.equals("prompt")||kind.equals("popup"))&&prefs.getBoolean("allApps",false);
+        return prefs.getBoolean(kind+":"+pkg,allApps);
+    }
     public void set(String pkg,String kind,boolean value) { prefs.edit().putBoolean(kind+":"+pkg,value).apply(); }
     public Set<String> packages() {
         Set<String> result=new HashSet<>(prefs.getStringSet("manual",Collections.emptySet()));
-        for(String key:prefs.getAll().keySet()) if(key.startsWith("splash:")||key.startsWith("prompt:")) result.add(key.substring(key.indexOf(':')+1));
+        for(String key:prefs.getAll().keySet()) if(key.startsWith("splash:")||key.startsWith("prompt:")||key.startsWith("popup:")) result.add(key.substring(key.indexOf(':')+1));
         return result;
     }
     public void addPackage(String pkg) { Set<String> p=packages();p.add(pkg);prefs.edit().putStringSet("manual",p).apply(); }
@@ -48,12 +51,12 @@ public final class Store extends SQLiteOpenHelper {
         try(Cursor c=getReadableDatabase().rawQuery("SELECT COALESCE(SUM(n),0) FROM daily"+(today?" WHERE day=?":""),today?new String[]{day(System.currentTimeMillis())}:null)){return c.moveToFirst()?c.getLong(0):0;}
     }
     public static final class Stat {
-        public String pkg; public long splash,prompt,back; public long total(){return splash+prompt+back;}
+        public String pkg; public long splash,prompt,popup,back; public long total(){return splash+prompt+popup+back;}
     }
     public List<Stat> stats(boolean today) {
         List<Stat> out=new ArrayList<>();
-        String sql="SELECT pkg,SUM(CASE WHEN kind='splash' THEN n ELSE 0 END),SUM(CASE WHEN kind='prompt' THEN n ELSE 0 END),SUM(CASE WHEN kind='back' THEN n ELSE 0 END) FROM daily"+(today?" WHERE day=?":"")+" GROUP BY pkg ORDER BY SUM(n) DESC";
-        try(Cursor c=getReadableDatabase().rawQuery(sql,today?new String[]{day(System.currentTimeMillis())}:null)) {while(c.moveToNext()){Stat s=new Stat();s.pkg=c.getString(0);s.splash=c.getLong(1);s.prompt=c.getLong(2);s.back=c.getLong(3);out.add(s);}}return out;
+        String sql="SELECT pkg,SUM(CASE WHEN kind='splash' THEN n ELSE 0 END),SUM(CASE WHEN kind='prompt' THEN n ELSE 0 END),SUM(CASE WHEN kind='popup' THEN n ELSE 0 END),SUM(CASE WHEN kind='back' THEN n ELSE 0 END) FROM daily"+(today?" WHERE day=?":"")+" GROUP BY pkg ORDER BY SUM(n) DESC";
+        try(Cursor c=getReadableDatabase().rawQuery(sql,today?new String[]{day(System.currentTimeMillis())}:null)) {while(c.moveToNext()){Stat s=new Stat();s.pkg=c.getString(0);s.splash=c.getLong(1);s.prompt=c.getLong(2);s.popup=c.getLong(3);s.back=c.getLong(4);out.add(s);}}return out;
     }
     public List<String[]> history() {
         List<String[]> out=new ArrayList<>();
@@ -83,10 +86,11 @@ public final class Store extends SQLiteOpenHelper {
             JSONObject r=rules.getJSONObject(i);
             validateTypes(r,new String[]{"id","package","kind","text","viewId","activity","context"});
             String id=r.getString("id"),pkg=r.getString("package"),kind=r.getString("kind");
-            if(id.isEmpty()||id.length()>80||!ids.add(id)||!validPackage(pkg)||!(kind.equals("splash")||kind.equals("prompt")))throw new JSONException("规则编号、包名或类型无效");
+            if(id.isEmpty()||id.length()>80||!ids.add(id)||!validPackage(pkg)||!(kind.equals("splash")||kind.equals("prompt")||kind.equals("popup")))throw new JSONException("规则编号、包名或类型无效");
             if(r.optString("text").isEmpty()&&r.optString("viewId").isEmpty())throw new JSONException("必须指定 text 或 viewId");
             for(String k:new String[]{"text","viewId","activity","context"})if(r.optString(k).length()>200)throw new JSONException("规则字段过长");
             if(kind.equals("prompt")&&r.optString("context").isEmpty())throw new JSONException("提示规则必须指定 context");
+            if(kind.equals("popup")&&(r.optString("activity").trim().isEmpty()||r.optString("context").trim().isEmpty()))throw new JSONException("弹窗规则必须指定 activity 和 context");
             if(!r.optString("viewId").isEmpty()&&!r.optString("viewId").startsWith(pkg+":id/"))throw new JSONException("viewId 必须属于指定应用");
         }
         for(int i=0;i<returns.length();i++){JSONObject r=returns.getJSONObject(i);validateTypes(r,new String[]{"source","target"});String s=r.getString("source"),t=r.getString("target");if(!validPackage(s)||!validPackage(t)||s.equals(t)||s.equals("com.wangqingli.app")||t.equals("com.wangqingli.app"))throw new JSONException("返回规则需要两个不同的外部应用包名");}

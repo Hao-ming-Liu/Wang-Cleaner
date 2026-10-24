@@ -18,9 +18,13 @@ final class ServiceTests {
     static void run(DeviceTestRunner r, String originalServices) {
         r.test("accessibility service binds without suppressing other services", () -> {
             String services = "null".equals(originalServices) ? "" : originalServices;
-            if (!java.util.Arrays.asList(services.split(":")).contains(COMPONENT)) {
-                services = services.isEmpty() ? COMPONENT : services + ":" + COMPONENT;
-            }
+            java.util.List<String> others = new java.util.ArrayList<>();
+            for (String service : services.split(":")) if (!service.isEmpty() && !service.equals(COMPONENT)) others.add(service);
+            String remaining = String.join(":", others);
+            if (remaining.isEmpty()) r.shell("settings delete secure enabled_accessibility_services");
+            else r.shell("settings put secure enabled_accessibility_services " + DeviceTestRunner.quote(remaining));
+            r.await("old service unbound", TIMEOUT, () -> !GuardService.connected);
+            services = remaining.isEmpty() ? COMPONENT : remaining + ":" + COMPONENT;
             r.shell("settings put secure enabled_accessibility_services " + DeviceTestRunner.quote(services));
             r.shell("settings put secure accessibility_enabled 1");
             r.await("GuardService connection", TIMEOUT, () -> GuardService.connected);
@@ -40,11 +44,95 @@ final class ServiceTests {
             awaitText(r, SOURCE, "开屏已跳过");
             r.await("bare splash operation recorded", TIMEOUT, () -> r.store.total(false) == 1);
         });
+        r.test("returning through home starts a fresh splash session", () -> {
+            prepare(r);
+            GuardService.diagnostics.start(android.os.SystemClock.elapsedRealtime());
+            launch(r, "bare_splash");
+            awaitText(r, SOURCE, "开屏已跳过");
+            r.await("first skip saved", TIMEOUT, () -> r.store.total(false) == 1);
+            goHome(r);
+            launch(r, "bare_splash");
+            try { awaitText(r, SOURCE, "开屏已跳过"); }
+            catch (AssertionError error) { throw new AssertionError(error.getMessage()+"\n"+GuardService.diagnostics.report(android.os.SystemClock.elapsedRealtime()), error); }
+            r.await("second session skip saved", TIMEOUT, () -> r.store.total(false) == 2);
+            GuardService.diagnostics.stop();
+        });
         r.test("last delayed content event is eventually scanned", () -> {
             prepare(r);
             launch(r, "delayed_splash");
             awaitText(r, SOURCE, "开屏已跳过");
             r.await("delayed splash recorded", TIMEOUT, () -> r.store.total(false) == 1);
+        });
+        r.test("text lookup finds skip beyond the bounded traversal", () -> {
+            prepare(r);
+            launch(r, "dense_splash");
+            awaitText(r, SOURCE, "开屏已跳过");
+            r.await("dense splash recorded", TIMEOUT, () -> r.store.total(false) == 1);
+        });
+        r.test("global coverage handles an app without individual opt-in", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.prefs.edit().remove("splash:" + SOURCE)
+                    .remove("prompt:" + SOURCE).putBoolean("allApps", true).commit());
+            launch(r, "bare_splash");
+            awaitText(r, SOURCE, "开屏已跳过");
+            r.await("global splash recorded", TIMEOUT, () -> r.store.total(false) == 1);
+        });
+        r.test("per-app false overrides global coverage", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.prefs.edit().putBoolean("allApps", true)
+                    .putBoolean("splash:" + SOURCE, false).commit());
+            launch(r, "bare_splash");
+            unchanged(r, "跳过", OBSERVE);
+        });
+        r.test("explicit ad popup works after the splash window and records popup category", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.set(SOURCE, "popup", true));
+            launch(r, "popup_wait");
+            r.await("delayed popup closed", 19000, () -> hasText(r, SOURCE, "弹窗已关闭"));
+            r.await("popup recorded", TIMEOUT, () -> r.store.total(false) == 1);
+            equal(1L, StoreTests.stat(r.store.stats(false), SOURCE).popup, "Popup category");
+        });
+        r.test("global popup protection never clicks an ordinary close button", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.prefs.edit().putBoolean("allApps", true).commit());
+            launch(r, "popup_plain");
+            unchanged(r, "关闭", OBSERVE);
+        });
+        r.test("compact dialog close is measured against the display", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.set(SOURCE, "popup", true));
+            launch(r, "popup_dialog");
+            awaitText(r, SOURCE, "弹窗已关闭");
+            r.await("dialog popup recorded", TIMEOUT, () -> r.store.total(false) == 1);
+            equal(1L, StoreTests.stat(r.store.stats(false), SOURCE).popup, "Dialog popup category");
+        });
+        for (String restriction : new String[]{"disabled", "context"}) {
+            r.test("popup " + restriction + " restriction prevents built-in fallback", () -> {
+                prepare(r);
+                r.runOnMainSync(() -> r.store.set(SOURCE, "popup", true));
+                JSONObject rule = new JSONObject().put("id", "popup-restricted").put("package", SOURCE)
+                        .put("kind", "popup").put("text", "关闭广告")
+                        .put("activity", "com.wangqingli.fixture.MainActivity").put("context", "弹窗测试");
+                if (restriction.equals("disabled")) rule.put("enabled", false);
+                else rule.put("context", "not present");
+                importRules(r, StoreTests.document().put("rules", new JSONArray().put(rule)));
+                launch(r, "popup_ad");
+                unchanged(r, "关闭广告", OBSERVE);
+            });
+        }
+        r.test("ordinary close needs matching popup activity and context", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.set(SOURCE, "popup", true));
+            JSONObject rule = new JSONObject().put("id", "popup-test").put("package", SOURCE)
+                    .put("kind", "popup").put("activity", "com.wangqingli.fixture.MainActivity")
+                    .put("context", "优惠推广").put("viewId", SOURCE + ":id/popup_close");
+            importRules(r, StoreTests.document().put("rules", new JSONArray().put(rule)));
+            launch(r, "popup_plain");
+            unchanged(r, "关闭", OBSERVE);
+            launch(r, "popup_rule");
+            awaitText(r, SOURCE, "弹窗已关闭");
+            r.await("popup rule recorded", TIMEOUT, () -> r.store.total(false) == 1);
+            equal("popup-test", r.store.history().get(0)[3], "Popup attribution");
         });
         r.test("explicit opening prompt is cancelled and categorized", () -> {
             prepare(r);
@@ -145,6 +233,78 @@ final class ServiceTests {
             r.remains("A second transition in the resumed source session cannot loop", 2600,
                     () -> hasText(r, TARGET, "测试落地页") && r.store.total(false) == 1);
         });
+        r.test("home transition invalidates earlier advertising evidence", () -> {
+            prepare(r);
+            enableReturn(r);
+            launch(r, "ad_link");
+            settleSource(r, "广告");
+            goHome(r);
+            r.shell("am start -W -n " + TARGET + "/com.wangqingli.fixture.MainActivity");
+            awaitText(r, TARGET, "测试落地页");
+            r.remains("Home breaks source-to-target attribution", OBSERVE,
+                    () -> hasText(r, TARGET, "测试落地页") && r.store.total(false) == 0);
+        });
+        r.test("newly enabled home application is excluded without restarting service", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.prefs.edit().putBoolean("allApps", true).commit());
+            try {
+                r.shell("am start -W -n " + SOURCE + "/com.wangqingli.fixture.MainActivity --ez testHome true");
+                android.content.Intent home = new android.content.Intent(android.content.Intent.ACTION_MAIN)
+                        .addCategory(android.content.Intent.CATEGORY_HOME);
+                r.await("test home handler visible",TIMEOUT,() -> r.getTargetContext().getPackageManager().queryIntentActivities(home, 0).stream()
+                        .anyMatch(info -> SOURCE.equals(info.activityInfo.packageName)));
+                r.shell("am start -W -n com.wangqingli.app/.MainActivity");
+                r.await("own app foreground",TIMEOUT,() -> rootPackage(r).equals("com.wangqingli.app"));
+                launch(r, "bare_splash");
+                unchanged(r, "跳过", OBSERVE);
+            } finally {
+                r.shell("am start -W -n " + SOURCE + "/com.wangqingli.fixture.MainActivity --ez testHome false");
+            }
+        });
+        r.test("diagnostics observes real event scan candidate and click stages without page text", () -> {
+            prepare(r);
+            GuardService.diagnostics.start(android.os.SystemClock.elapsedRealtime());
+            try {
+                launch(r, "negative");
+                unchanged(r, "普通按钮测试", OBSERVE);
+                launch(r, "splash");
+                awaitText(r, SOURCE, "开屏已跳过");
+                r.await("diagnostic click recorded", TIMEOUT, () -> r.store.total(false) == 1);
+                String report = GuardService.diagnostics.report(android.os.SystemClock.elapsedRealtime());
+                for (String stage : new String[]{SOURCE, "事件：", "扫描：", "无候选：", "候选：", "点击成功：1"})
+                    check(report.contains(stage), "Missing diagnostic stage " + stage + " in " + report);
+                check(!report.contains("普通按钮测试") && !report.contains("跳过 5s"), "No page text in report");
+            } finally { GuardService.diagnostics.stop(); }
+        });
+        r.test("two rejected candidates do not create an endless cooldown retry", () -> {
+            prepare(r);
+            r.runOnMainSync(() -> r.store.set(SOURCE,"popup",true));
+            GuardService.diagnostics.start(android.os.SystemClock.elapsedRealtime());
+            try {
+                launch(r,"popup_rejected");
+                r.await("rejected click observed",TIMEOUT,() -> diagnosticFailures()>0);
+                unchanged(r,"拒绝点击测试",3100);
+                int failures=diagnosticFailures();
+                r.remains("No retry renewal without a new event",4500,
+                        () -> diagnosticFailures()==failures && r.store.total(false)==0);
+            } finally { GuardService.diagnostics.stop(); }
+        });
+    }
+
+    private static int diagnosticFailures() {
+        String report=GuardService.diagnostics.report(android.os.SystemClock.elapsedRealtime());
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?m)^"+java.util.regex.Pattern.quote(SOURCE)+" .*点击失败：(\\d+)").matcher(report);
+        return m.find()?Integer.parseInt(m.group(1)):0;
+    }
+
+    private static void goHome(DeviceTestRunner r) throws Exception {
+        r.shell("input keyevent KEYCODE_HOME");
+        r.await("home foreground", TIMEOUT, () -> {
+            String pkg = rootPackage(r);
+            return !pkg.isEmpty() && !pkg.equals(SOURCE) && !pkg.equals(TARGET);
+        });
+        r.remains("home stays foreground for event processing", 650,
+                () -> !rootPackage(r).equals(SOURCE) && !rootPackage(r).equals(TARGET));
     }
 
     private static void prepare(DeviceTestRunner r) throws Exception {
